@@ -13,14 +13,14 @@
     )
   )
 
-; [[1 2 3] [4 5 6] [7 8 9]]
+; 1 2 3
+; 4 5 6
+; 7 8 9
 (def plain-num-pad
   (vec (map vec (partition 3 (range 1 10))))
   )
 
-(def plain-num-pad-pair
-  [plain-num-pad [1 1]]
-  )
+(def plain {:key-map plain-num-pad :initial-path [1 1]})
 
 ;    1
 ;  2 3 4
@@ -35,21 +35,16 @@
   4 {2 \D}
   })
 
-(def fancy-num-pad-pair
-  [fancy-num-pad [2 0]]
-  )
+(def fancy {:key-map fancy-num-pad :initial-path [2 0]})
 
-(defn path-differential
-  [letter]
-  (case letter
-    \R [0 1]
-    \L [0 -1]
-    \U [-1 0]
-    \D [1 0]
-    )
-  )
+(def path-differential {
+  \R [0 1]
+  \L [0 -1]
+  \U [-1 0]
+  \D [1 0]
+  })
 
-(defn new-path
+(defn update-path
   [[x y] letter]
   (let [[dx dy] (path-differential letter)]
     [(+ x dx) (+ y dy)]
@@ -61,7 +56,7 @@
   (if (not instruction)
     {:button last-button :path current-path}
     (let [
-      path-prime (new-path current-path instruction)
+      path-prime (update-path current-path instruction)
       next-button (get-in num-pad path-prime)
       next-path (if next-button path-prime current-path)
       button-prime (if next-button next-button last-button)
@@ -94,6 +89,6 @@
   )
 
 (defn final-button
-  [[num-pad initial-path] lines]
-  (final-button-recur num-pad initial-path [] lines)
+  [{:keys [key-map initial-path]} lines]
+  (str/join (final-button-recur key-map initial-path [] lines))
   )
