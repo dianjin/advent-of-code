@@ -17,138 +17,91 @@
   )
 
 (def initial-position
-  {:orientation 0
-   :x 0
-   :y 0
-  }
+  {:orientation 0 :x 0 :y 0}
   )
 
-(defn char->rotation
-  [letter]
-  (case letter
-    \L -1
-    \R 1
-    )
+(def char->rotation
+  {\L -1 \R 1}
   )
 
 (defn token->direction
-  [token]
-  (let [
-    x (first token)
-    xs (Integer/parseInt (last (str/split token #"[A-Z]")))
-    ]
-    {:rotate (char->rotation x)
-     :steps xs
-    }
+  [[direction-char & steps]]
+  (cons
+    (char->rotation direction-char)
+    (repeat (dec (Integer/parseInt (str/join steps))) 0)
     )
   )
 
-; 0 -> north
-; 1 -> east
-; 2 -> south
-; 3 -> west
 (defn apply-rotation
-  [orientation rotate]
+  [rotate orientation]
   (mod (+ orientation rotate) 4)
   )
 
-(defn multiplier
-  [orientation]
-  (case orientation
-    0 -1
-    1 1
-    2 1
-    3 -1
-    )
-  )
+(def multiplier {
+  0 {:dx 0 :dy -1} ; north
+  1 {:dx 1 :dy 0} ; east
+  2 {:dx 0 :dy 1} ; south
+  3 {:dx -1 :dy 0} ; west
+  })
 
-(defn intermediate-position-keys
-  [{:keys [orientation x y]} {:keys [rotate steps]}]
+(defn update-position
+  [rotate {:keys [orientation x y]}]
   (let [
-    o-prime (apply-rotation orientation rotate)
-    steps-factor (multiplier o-prime)
-    x-prime (* steps-factor (if (even? o-prime) 0 1))
-    y-prime (* steps-factor (if (even? o-prime) 1 0))
-    intemediates (range 1 (inc steps))
-    ]
-    (reduce
-      (fn [visited-set increment]
-        (set/union
-          visited-set
-          #{(seq [
-            (+ x (* increment x-prime))
-            (+ y (* increment y-prime))
-            ]
-            )}
-          )
-        )
-      #{}
-      intemediates
-      )
-    )
-  )
-
-(defn next-position
-  [{:keys [orientation x y]} {:keys [rotate steps]}]
-  (let [
-    o-prime (apply-rotation orientation rotate)
-    steps-factor (multiplier o-prime)
-    x-prime (* steps-factor (if (even? o-prime) 0 steps))
-    y-prime (* steps-factor (if (even? o-prime) steps 0))
+    o-prime (apply-rotation rotate orientation)
+    {:keys [dx dy]} (multiplier o-prime)
     ] {
-      :orientation o-prime
-      :x (+ x x-prime)
-      :y (+ y y-prime)
+    :orientation o-prime
+    :x (+ x dx)
+    :y (+ y dy)
     })
   )
 
 (defn distance
-  [final-pos]
-  (let [{:keys [x y]} final-pos]
-    (+ (Math/abs x) (Math/abs y))
-    )
+  [{:keys [x y]}]
+  (+ (Math/abs x) (Math/abs y))
   )
 
 (defn final-position
-  []
+  [directions]
   (reduce
-    (fn [current-pos direction]
-      (next-position current-pos direction)
+    (fn [current-position rotate]
+      (update-position rotate current-position)
       )
     initial-position
-    (map token->direction (file->tokens))
+    directions
     )
   )
 
-(defn first-visited-twice
-  [visited-set {:keys [x y] :as current-pos} directions]
+(defn final-distance
+  []
+  (distance
+    (final-position
+      (apply concat (map token->direction (file->tokens)))
+      )
+    )
+  )
+
+(defn first-visited-twice-recur
+  [visited-set current-pos [current-direction & rest-directions]]
   (let [
-    direction (first directions)
-    rest-directions (rest directions)
-    {x-prime :x y-prime :y :as position-prime} (next-position current-pos direction)
-    intermediate-positions (intermediate-position-keys current-pos direction)
-    new-set-key (seq [x-prime y-prime])
+    {:keys [x y] :as next-pos} (update-position current-direction current-pos)
     ]
-    (if (some #(contains? visited-set %) intermediate-positions)
-      (set/intersection visited-set intermediate-positions)
+    (if (contains? visited-set [x y])
+      (distance next-pos)
       (recur
-        (set/union
-          visited-set
-          intermediate-positions
-          #{new-set-key}
-          )
-        position-prime
+        (set/union visited-set #{[x y]})
+        next-pos
         rest-directions
         )
       )
     )
   )
 
-(defn find-visited-twice
+(defn first-visited-twice
   []
-  (first-visited-twice
-    #{}
+  (first-visited-twice-recur
+    #{[0 0]}
     initial-position
-    (map token->direction (file->tokens))
+    (apply concat (map token->direction (file->tokens)))
     )
   )
